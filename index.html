@@ -704,7 +704,7 @@ const Sound = (() => {
       clearTimeout(loopT);
       // Hussein #116/#118: no sound at all before or while the doors open – only the song, once they stand open
       const t = ac.currentTime + .05;
-      startSong(t + (RM ? .2 : 1.4)); on = true; setBtn();
+      startSong(t + (RM ? .6 : 3.4)); on = true; setBtn();   // only after the gate has fully gone (settle at 3.15 s)
     },
     close() {
       if (!init()) return; if (ac.state === 'suspended') ac.resume();
