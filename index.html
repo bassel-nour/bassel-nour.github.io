@@ -645,30 +645,28 @@ const Sound = (() => {
   function noise(sec) { const b = ac.createBuffer(1, Math.floor(ac.sampleRate * sec), ac.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = ac.createBufferSource(); s.buffer = b; return s; }
   function env(g, t, a, peak, dur) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
   function door(t, closing) {
-    // opening: latch + knock, then creak · closing: creak, then the knock as the doors meet
-    const tk = closing ? t + 1.75 : t;
-    const n1 = noise(.06), hp = ac.createBiquadFilter(), g1 = ac.createGain(); hp.type = 'highpass'; hp.frequency.value = 1800; env(g1, tk, .002, .35, .05); n1.connect(hp).connect(g1).connect(dry); n1.start(tk);
-    const k = ac.createOscillator(), gk = ac.createGain(); k.frequency.setValueAtTime(110, tk + .05); k.frequency.exponentialRampToValueAtTime(52, tk + .4); env(gk, tk + .05, .004, .5, .45); k.connect(gk).connect(dry); gk.connect(verb); k.start(tk + .05); k.stop(tk + .6);
-    // creak: stick-slip friction of an old hinge
-    const t0 = closing ? t + .1 : t + .32, dur = 1.55;
-    [[1, .11], [1.93, .05]].forEach(([mul, vol]) => {
-      const o = ac.createOscillator(), bp = ac.createBiquadFilter(), g = ac.createGain(); o.type = 'sawtooth';
-      const steps = 40, fr = new Float32Array(steps), am = new Float32Array(steps);
-      for (let i = 0; i < steps; i++) { const p = i / (steps - 1); fr[i] = (78 + 55 * Math.sin(p * 3.1) + Math.random() * 18) * mul; am[i] = vol * Math.sin(Math.PI * p) * (.35 + Math.random() * .65); }
-      am[0] = 0; am[steps - 1] = 0;
-      o.frequency.setValueCurveAtTime(fr, t0, dur); bp.type = 'bandpass'; bp.Q.value = 7; bp.frequency.setValueAtTime(750, t0); bp.frequency.linearRampToValueAtTime(1350, t0 + dur);
-      g.gain.setValueAtTime(0, t0); g.gain.setValueCurveAtTime(am, t0, dur);
-      o.connect(bp).connect(g).connect(dry); g.connect(verb); o.start(t0); o.stop(t0 + dur + .05);
-    });
+    // calm and muffled, no creak: a very soft latch tick, the slow air of a heavy door, a deep wooden "thum"
+    const t0 = closing ? t : t + .15, d = 1.7;
+    const sw = noise(d + .2), lp = ac.createBiquadFilter(), gs = ac.createGain(); lp.type = 'lowpass'; lp.Q.value = .5;
+    lp.frequency.setValueAtTime(closing ? 850 : 200, t0); lp.frequency.exponentialRampToValueAtTime(closing ? 180 : 850, t0 + d);
+    gs.gain.setValueAtTime(0.0001, t0); gs.gain.exponentialRampToValueAtTime(.07, t0 + d * .45); gs.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    sw.connect(lp).connect(gs).connect(dry); gs.connect(verb); sw.start(t0); sw.stop(t0 + d + .1);
+    const tl = closing ? t + 1.72 : t, tick = noise(.03), bp = ac.createBiquadFilter(), gt = ac.createGain();
+    bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 2.5; env(gt, tl, .002, .035, .045); tick.connect(bp).connect(gt).connect(dry); tick.start(tl);
+    const tk = closing ? t + 1.68 : t + .06, o = ac.createOscillator(), lo = ac.createBiquadFilter(), go = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(closing ? 76 : 64, tk); o.frequency.exponentialRampToValueAtTime(46, tk + .55);
+    lo.type = 'lowpass'; lo.frequency.value = 170; env(go, tk, .02, closing ? .2 : .1, .8);
+    o.connect(lo).connect(go).connect(dry); go.connect(verb); o.start(tk); o.stop(tk + .9);
   }
   function light(t) {
-    const n = noise(2.4), bp = ac.createBiquadFilter(), g = ac.createGain(); bp.type = 'bandpass'; bp.Q.value = 1.2;
-    bp.frequency.setValueAtTime(350, t); bp.frequency.exponentialRampToValueAtTime(4200, t + 2.2);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(.16, t + 1.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
-    n.connect(bp).connect(g).connect(dry); g.connect(verb); n.start(t);
-    [1567.98, 2093, 2349.32, 2793.83, 3135.96, 3729.31].forEach((f, i) => {
-      const o = ac.createOscillator(), go = ac.createGain(); o.type = 'sine'; o.frequency.value = f; env(go, t + .5 + i * .16, .01, .045, 2.2);
-      o.connect(go); go.connect(verb); go.connect(dry); o.start(t + .5 + i * .16); o.stop(t + 3);
+    // a soft warm swell of light, then a slow harp-like glint (D – F – A – D)
+    const n = noise(2.6), lp = ac.createBiquadFilter(), g = ac.createGain(); lp.type = 'lowpass'; lp.Q.value = .3;
+    lp.frequency.setValueAtTime(400, t); lp.frequency.exponentialRampToValueAtTime(2200, t + 2.2);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(.035, t + 1.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+    n.connect(lp).connect(g); g.connect(verb); n.start(t);
+    [587.33, 698.46, 880, 1174.66, 1396.91].forEach((f, i) => {
+      const o = ac.createOscillator(), go = ac.createGain(); o.type = 'sine'; o.frequency.value = f; env(go, t + .45 + i * .22, .012, .03, 2.6);
+      o.connect(go); go.connect(verb); go.connect(dry); o.start(t + .45 + i * .22); o.stop(t + 4);
     });
   }
   // an original slow melody in maqam Nahawand on D, plucked like a qanun
